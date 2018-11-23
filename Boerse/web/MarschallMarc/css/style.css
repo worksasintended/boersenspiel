@@ -35,6 +35,13 @@ h2{
     border-radius: 15px;
 }
 
+.news {
+    overflow-y: scroll;
+    height: 10em;
+    resize: none;
+    width: 100%;
+}
+
 .chartParent {
     background-color: #f0f0f0;
     color: #000000;

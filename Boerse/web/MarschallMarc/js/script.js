@@ -2,15 +2,15 @@
 
 //global settings
 const interval = 500;
-const chartSteps = 60; //number of steps n abscissa
+const chartSteps = 100; //number of steps in abscissa
 const serverLocation = ""; //assume it is running on same server, add server path if necessary
 const globalSharesAddr = serverLocation + "/data/alleAktien";
 const userDataAddr = serverLocation + "/data/userData";
 const usersDataAddr = serverLocation + "/data/besitzAlle";
 const depotAddr = serverLocation + "/data/depot";
-const revenueAddr = serverLocation + "/data/umsaetze";
+const salesAddr = serverLocation + "/data/umsaetze/";
 const tradeAddr = serverLocation + "/data/umsaetze/add";
-const newsAddr = serverLocation + "/data/nachrichten";
+const newsAddr = serverLocation + "/data/nachrichten?letzteZeit=";
 
 window.onload = init;
 
@@ -48,19 +48,30 @@ function init() {
  * @param index index number to choose from array, mod 40
  * @returns {string} string of html hex color
  */
-function color(index){
+function color(index) {
     let colors = [
         "#00ff00", "#f58341", "#000000", "#0000ff",
         "#00008b", "#008b8b", "#a90008", "#a52a2a",
         "#006400", "#bdb76b", "#8b008b", "#556b2f",
         "#ff8c00", "#9932cc", "#8b0000", "#e9967a",
-        "#9400d3", "#ff00ff", "#ffd700","#008000",
+        "#9400d3", "#ff00ff", "#ffd700", "#008000",
         "#4b0082", "#f0e68c", "#add8e6", "#e0ffff",
         "#90ee90", "#d3d3d3", "#ffb6c1", "#9dceff",
         "#00ff00", "#ff00ff", "#800000", "#000080",
-        "#808000",  "#ffa500", "#27ff28","#800080",
-        "#800080", "#ff0000",  "#c0c0c0", "#ffff00"];
-    return colors[index%40];
+        "#808000", "#ffa500", "#27ff28", "#800080",
+        "#800080", "#ff0000", "#c0c0c0", "#ffff00"];
+    return colors[index % 40];
+}
+
+//print all news to news area
+function printNews(newsList) {
+    const newsfield = document.getElementById("news");
+    //clear newsfield
+    newsfield.innerText = "";
+    //fill newsfield
+    for (let i = newsList.length; i > 0; i--) {
+        newsfield.innerText += newsList[i - 1].uhrzeit + "Uhr: " + newsList[i - 1].text + "\n";
+    }
 }
 
 
@@ -69,12 +80,15 @@ function color(index){
  * @param steps number of steps on abscissa
  * @returns {Array}
  */
-function createLabelset(steps){
-    let label =[];
-    for(let i = steps; i>0; i-- ){
+function createLabelset(steps) {
+    let label = [];
+    for (let i = steps; i > 0; i--) {
         //every fifth step labeled
-        if(i%5==0){label.push(-i)}
-        else{label.push("")};
+        if (i % 5 === 0) {
+            label.push(-i)
+        } else {
+            label.push("")
+        }
     }
     return label;
 }
@@ -85,12 +99,12 @@ function createLabelset(steps){
  * @param label label array
  * @returns {{type: string, data: {labels: *, datasets: *[]}, options: {title: {display: boolean, text: string}, scales: {yAxes: {scaleLabel: {display: boolean, labelString: string}}[], xAxes: {scaleLabel: {display: boolean, labelString: string}}[]}, responsive: boolean, maintainAspectRatio: boolean}}}
  */
-function createChartDataSet(label){
+function createChartDataSet(label) {
     return {
         type: 'line',
         data: {
             labels: label,
-            datasets: [ ]
+            datasets: []
         },
         options: {
             title: {
@@ -129,13 +143,17 @@ function createChartDataSet(label){
 function createView(sharesState, userShares, buyQueue, sellQueue, chartData, chart) {
     setInterval(function () {
             //global shares info, buying queue check
-            getFromApi(globalSharesAddr, updateGlobalShares, printError, sharesState, buyQueue, chartData, chart);
+            getFromApi(globalSharesAddr, updateGlobalShares, printErrorLog, sharesState, buyQueue, chartData, chart);
             //depot info and selling queue check
-            getFromApi(depotAddr, updateDepot, printError, userShares, sellQueue);
+            getFromApi(depotAddr, updateDepot, printErrorLog, userShares, sellQueue);
             //user data (name and balance)
-            getFromApi(userDataAddr, printUserData, printError, null);
+            getFromApi(userDataAddr, printUserData, printErrorLog, null);
             //users data (name and balance+valueOf(shares)
-            getFromApi(usersDataAddr, printBestList, printError, null);
+            getFromApi(usersDataAddr, printBestList, printErrorLog, null);
+            //get time one minute ago
+            //TODO: change to ntp to sync local time with server time (if local time is ahead more than one minute no messages are shown)
+            let time = new Date().getTime() - (60 * 1000);
+            getFromApi(newsAddr + time, printNews, printErrorLog, null);
             //trading queue
             printTradingQueue(sellQueue, buyQueue);
         }
@@ -153,7 +171,7 @@ function buyButtonEvent(sharesState, buyQueue) {
     const selectBuyShare = document.getElementById("buyName");
     const buyAmount = document.getElementById("buyAmount");
     const buyMaxValue = document.getElementById("buyMaxValue");
-    return function() {
+    return function () {
         if (selectBuyShare.selectedIndex < 0) {
             alert("Please select a share and make sure all fields are filled in correctly!");
         } else if (parseFloat(buyMaxValue.value) >= 0 && parseInt(buyAmount.value) > 0) {
@@ -161,7 +179,7 @@ function buyButtonEvent(sharesState, buyQueue) {
             addTradeElement(name, buyAmount.value, buyMaxValue.value, buyQueue);
         } else {
             const name = selectBuyShare.options[selectBuyShare.selectedIndex].text;
-            tradeShare(name, 1, tradeAddr);
+            tradeShareNonCheck(name, 1, tradeAddr);
         }
     };
 }
@@ -175,7 +193,7 @@ function sellButtonEvent(sharesState, userShares, sellQueue) {
     const selectSellShare = document.getElementById("sellName");
     const sellAmount = document.getElementById("sellAmount");
     const sellMinValue = document.getElementById("sellMinValue");
-    return function() {
+    return function () {
         if (selectSellShare.selectedIndex < 0) {
             alert("Please select a share and make sure all fields are filled in correctly!");
         } else if (parseFloat(sellMinValue.value) > 0 && parseInt(sellAmount.value) > 0) {
@@ -183,7 +201,7 @@ function sellButtonEvent(sharesState, userShares, sellQueue) {
             addTradeElement(name, -sellAmount.value, sellMinValue.value, sellQueue);
         } else {
             const name = selectSellShare.options[selectSellShare.selectedIndex].text;
-            tradeShare(name, -1, tradeAddr);
+            tradeShareNonCheck(name, -1, tradeAddr);
         }
     };
 }
@@ -230,8 +248,7 @@ function getFromApi(serverAddr, successCallback, failCallback, prevState, tradeQ
         //if shareList param  not null go into function that builds global shares and checks trading queues
         if (prevState !== null) {
             prevState.shares = successCallback(JSON.parse(request.responseText), prevState.shares, tradeQueue, chartData, chart);
-        }
-        else {
+        } else {
             successCallback(JSON.parse(request.responseText));
         }
 
@@ -246,7 +263,7 @@ function getFromApi(serverAddr, successCallback, failCallback, prevState, tradeQ
  * @param successCallback
  * @param failCallback
  */
-function postToApi(serverAddr, data, successCallback, failCallback) {
+function postToApi(serverAddr, data, successCallback, failCallback, tradeQueue, mVal, name, amount) {
     //start request
     let request = new XMLHttpRequest();
     request.open("POST", serverAddr, true); //async
@@ -254,37 +271,66 @@ function postToApi(serverAddr, data, successCallback, failCallback) {
     request.onload = function () {
         //if not expected
         if (request.status !== 201) {
-            failCallback("Error trading with status " + request.status + ": " + request.response);
+            failCallback("Error trading with status " + request.status + ": " + request.response, name, amount, tradeQueue, mVal);
             return;
         }
-        successCallback(request.response);
+        successCallback(JSON.parse(request.responseText));
     };
     request.send(JSON.stringify(data));
 }
 
-function tradeShare(_name, _amount,) {
+function tradeShare(_name, _amount, tradeQueue, mVal) {
     const dataObj = {
         "aktie": {"name": _name},
         "anzahl": _amount
     };
-    postToApi(tradeAddr, dataObj, printError, printError);
+    postToApi(tradeAddr, dataObj, getTradeInfo, tradeError, tradeQueue, mVal, _name, _amount);
     return true;
+}
+
+function tradeShareNonCheck(_name, _amount) {
+    const dataObj = {
+        "aktie": {"name": _name},
+        "anzahl": _amount
+    };
+    postToApi(tradeAddr, dataObj, getTradeInfo, printErrorLog);
+    return true;
+}
+
+
+function tradeError(errorString, name, amount, tradeQueue, mVal) {
+    printErrorLog(errorString);
+    addTradeElement(name, amount, mVal, tradeQueue);
+}
+
+function printErrorLog(errorString) {
+    document.getElementById("logs").innerText = errorString + "\n"
+        + document.getElementById("logs").innerText;
+}
+
+function printTrade(tradeMessage) {
+    document.getElementById("sales").innerText = tradeMessage.anzahl + " " + tradeMessage.aktie.name + ", at " + tradeMessage.aktie.preis + " each\n"
+        + document.getElementById("sales").innerText;
+}
+
+function getTradeInfo(tradeMessage) {
+    getFromApi(salesAddr + tradeMessage.id, printTrade, printErrorLog, null);
 }
 
 function printBestList(_usersData) {
     //clear table
     const table = document.getElementById("bestList");
     clearVerticalTable(table);
-        //inline sort data by users balance
-        _usersData.sort(function (a, b) {
-            return b.summe - a.summe
-        });
-        //write table
-        for (let i = _usersData.length; i > 0; i--) {
-            const row = table.insertRow(1);
-            row.insertCell(0).innerText = _usersData[i - 1].name;
-            row.insertCell(1).innerText = formatNumber(_usersData[i - 1].summe);
-        }
+    //inline sort data by users balance
+    _usersData.sort(function (a, b) {
+        return b.summe - a.summe
+    });
+    //write table
+    for (let i = _usersData.length; i > 0; i--) {
+        const row = table.insertRow(1);
+        row.insertCell(0).innerText = _usersData[i - 1].name;
+        row.insertCell(1).innerText = formatNumber(_usersData[i - 1].summe);
+    }
 }
 
 function updateDepot(_userData, prevState, sellQueue) {
@@ -366,16 +412,16 @@ function updateDepot(_userData, prevState, sellQueue) {
 
 }
 
-function printTradingQueue(sellQueue, buyQueue){
+function printTradingQueue(sellQueue, buyQueue) {
     const table = document.getElementById("tradingQueue");
     clearVerticalTable(table);
-    for (let i=0; i< sellQueue.shares.length; i++){
+    for (let i = 0; i < sellQueue.shares.length; i++) {
         const row = table.insertRow(1);
         row.insertCell(0).innerText = sellQueue.shares[i].name;
         row.insertCell(1).innerText = sellQueue.shares[i].amount;
         row.insertCell(2).innerText = sellQueue.shares[i].mVal;
     }
-    for (let i=0; i< buyQueue.shares.length; i++){
+    for (let i = 0; i < buyQueue.shares.length; i++) {
         const row = table.insertRow(1);
         row.insertCell(0).innerText = buyQueue.shares[i].name;
         row.insertCell(1).innerText = buyQueue.shares[i].amount;
@@ -437,7 +483,7 @@ function updateGlobalShares(sharesState, oldSharesState, buyQueue, chartData, ch
 }
 
 //checks if two shareStates are the same and returns boolean
-function sharesAreTheSame(sharesState1, sharesState2){
+function sharesAreTheSame(sharesState1, sharesState2) {
     let same = false;
     if (sharesState1.length === sharesState2.length) { //if amount has changed, no need to check each
         same = true;
@@ -456,7 +502,7 @@ function sharesAreTheSame(sharesState1, sharesState2){
  *
  * @param sharesState current global stock state
  */
-function createGlobalStockViews(sharesState){
+function createGlobalStockViews(sharesState) {
     const table = document.getElementById("globalStockTable");
     //clear global stock state view
     clearVerticalTable(table);
@@ -466,7 +512,8 @@ function createGlobalStockViews(sharesState){
     let selected = select.selectedIndex;
     if (selected !== -1) {
         selected = select.options[selected].text;
-    }    const length = select.options.length;
+    }
+    const length = select.options.length;
 
     //clear select
     for (let i = 0; i < length; i++) {
@@ -500,7 +547,7 @@ function createGlobalStockViews(sharesState){
 function checkBuyQueue(sharesState, buyQueue) {
     let toSplice = [];
     //check each element in buyQueue
-    for(let i=0; i<buyQueue.shares.length; i++){
+    for (let i = 0; i < buyQueue.shares.length; i++) {
         //search corresponding share in shareState
         for (let j = 0; j < sharesState.length; j++) {
             if (sharesState[j].name === buyQueue.shares[i].name) {
@@ -508,11 +555,11 @@ function checkBuyQueue(sharesState, buyQueue) {
                 if (buyQueue.shares[i].mVal >= sharesState[j].preis) {
                     let available = sharesState[j].anzahlVerfuegbar;
                     //if all shares from assignment are available
-                    if (available >=buyQueue.shares[i].amount) {
-                        tradeShare(buyQueue.shares[i].name, buyQueue.shares[i].amount);
+                    if (available >= buyQueue.shares[i].amount) {
+                        tradeShare(buyQueue.shares[i].name, buyQueue.shares[i].amount, buyQueue, buyQueue.shares[i].mVal);
                         toSplice.push(i);
                     } else if (available !== 0) { // buy all available but dont do zero buy event
-                        tradeShare(buyQueue.shares[i].name, available);
+                        tradeShare(buyQueue.shares[i].name, available, buyQueue, buyQueue.shares[i].mVal);
                         //adjust order
                         buyQueue.shares[i].amount -= available;
                     }
@@ -525,11 +572,11 @@ function checkBuyQueue(sharesState, buyQueue) {
     splice(toSplice, buyQueue);
 }
 
-function splice(toSplice, array){
+function splice(toSplice, array) {
     //sort that last one gets removed first, so index changing is not affecting splicing
-    toSplice.sort((a, b)=>b-a);
+    toSplice.sort((a, b) => b - a);
     //remove hit offers
-    for(let i=0; i < toSplice.length; i++){
+    for (let i = 0; i < toSplice.length; i++) {
         array.shares.splice(toSplice[i]);
     }
 }
@@ -540,27 +587,27 @@ function splice(toSplice, array){
  * @param sharesState global share state
  * @param sellQueue sell assignments
  */
-function checkSellQueue(userShares,sellQueue) {
+function checkSellQueue(userShares, sellQueue) {
     let toSplice = [];
     for (let i = 0; i < sellQueue.shares.length; i++) {
         //search share in users depot
         for (let j = 0; j < userShares.positionen.length; j++) {
-            if(userShares.positionen[j].aktie.name === sellQueue.shares[i].name) {
+            if (userShares.positionen[j].aktie.name === sellQueue.shares[i].name) {
                 let available = userShares.positionen[j].anzahl;
                 //remove from queue if not in stock anymore (mutiple assignments can be set for same stock)
-                if(available === 0){
+                if (available === 0) {
                     toSplice.push(i);
                     break;
                 }
                 //if price threshold is met
-                if(sellQueue.shares[i].mVal <= userShares.positionen[j].aktie.preis) {
+                if (sellQueue.shares[i].mVal <= userShares.positionen[j].aktie.preis) {
                     //if all shares assigned are available
-                    if(available >= -(sellQueue.shares[i].amount)) {
-                        tradeShare(sellQueue.shares[i].name, sellQueue.shares[i].amount);
+                    if (available >= -(sellQueue.shares[i].amount)) {
+                        tradeShare(sellQueue.shares[i].name, sellQueue.shares[i].amount, sellQueue, sellQueue.shares[i].mVal);
                         //splice later to not destroy iterating through sellQueue
                         toSplice.push(i);
-                    }else if(available > 0) {
-                        tradeShare(sellQueue.shares[i].name, -available);
+                    } else if (available > 0) {
+                        tradeShare(sellQueue.shares[i].name, -available, sellQueue, sellQueue.shares[i].mVal);
                         toSplice.push(i);
                     }
                 }
@@ -571,20 +618,20 @@ function checkSellQueue(userShares,sellQueue) {
 }
 
 
-function updateChart(chartData, chart, sharesState){
-    for(let i=0; i< sharesState.length; i++) {
+function updateChart(chartData, chart, sharesState) {
+    for (let i = 0; i < sharesState.length; i++) {
         chartData.data.datasets[i].data.push(sharesState[i].preis);
         chartData.data.datasets[i].data.shift();
     }
     chart.update();
 }
 
-function resetChart(chartData, chart, sharesState){
+function resetChart(chartData, chart, sharesState) {
     //create new chartDataSet
     chartData.data.datasets = [];
-    let zeroArray = Array.apply(null, Array(chartSteps-1)).map(Number.prototype.valueOf,0);
+    let zeroArray = Array.apply(null, Array(chartSteps - 1)).map(Number.prototype.valueOf, 0);
     //add each share to chart, initialize with zeros
-    for(let i=0; i< sharesState.length; i++){
+    for (let i = 0; i < sharesState.length; i++) {
         chartData.data.datasets.push(
             {
                 data: Object.create(zeroArray),
@@ -600,28 +647,6 @@ function resetChart(chartData, chart, sharesState){
 
 }
 
-function printRevenues(_shares) {
-
-}
-
-///print error message
-function printError(_errormsg) {
-    alert(_errormsg);
-}
-
-function getRevenues(_user) {
-
-}
-
-///get global trading information, e.g. selling, stocks, etc
-function getGlobalTrading() {
-
-}
-
-///requires object id and dataArray
-function plotData(_Data, _id) {
-
-}
 
 //store global sharesState
 class ShareStateClass {
@@ -638,7 +663,7 @@ class UserSharesClass {
 }
 
 class TradeQueue {
-        constructor(shares){
-            this.shares = shares;
-        }
+    constructor(shares) {
+        this.shares = shares;
+    }
 }
