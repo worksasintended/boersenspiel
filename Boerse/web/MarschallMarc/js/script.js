@@ -1,3 +1,5 @@
+//@author Marc Marschall
+
 "use strict";
 
 //global settings
@@ -26,10 +28,9 @@ function init() {
     //create chart
     const label = createLabelset(chartSteps);
     let chartData = createChartDataSet(label);
-
     const chart = new Chart(document.getElementById("chart"), chartData);
 
-    //create and update views, also checks trading queues
+    //create and update views, automated trading
     createView(sharesState, userShares, buyQueue, sellQueue, chartData, chart);
 
     //buy event
@@ -63,7 +64,10 @@ function color(index) {
     return colors[index % 40];
 }
 
-//print all news to news area
+/** create news view
+ **
+ * @param newsList list of news to display
+ */
 function printNews(newsList) {
     const newsfield = document.getElementById("news");
     //clear newsfield
@@ -75,7 +79,7 @@ function printNews(newsList) {
 }
 
 
-/**
+/**create chart label of given length
  *
  * @param steps number of steps on abscissa
  * @returns {Array}
@@ -101,9 +105,11 @@ function createLabelset(steps) {
  */
 function createChartDataSet(label) {
     return {
+        //plot type line points
         type: 'line',
         data: {
             labels: label,
+            // plot data arrays
             datasets: []
         },
         options: {
@@ -133,16 +139,24 @@ function createChartDataSet(label) {
 }
 
 
-/** /brief print and update all information
+/** /brief print and update all information, trigger auto trade
  *
- * @param sharesState object to store "alleAktien"
- * @param userShares object to store "userData"
+ * @param sharesState global share state
+ * @param userShares users depot state
+ * @param buyQueue buy assignments
+ * @param sellQueue sell assignments
+ * @param chartData plot data
+ * @param chart chart object
  *
- * sharesState and userShares are only updated here and used in every other function
+ * all information that can be used multiple times are stored and only requested once
+ * view update depends on changes. If the shares on the market available change (apple not on the market anymore but samung added)
+ * a lot more updated on the view are done. Commonly nothing gets updated, that did not change.
  */
 function createView(sharesState, userShares, buyQueue, sellQueue, chartData, chart) {
     setInterval(function () {
-            //global shares info, buying queue check
+            /*update chartData, sharesState, select at "Buy Shares", "Global Stock State"
+             * trigger buy events
+             */
             getFromApi(globalSharesAddr, updateGlobalShares, printErrorLog, sharesState, buyQueue, chartData, chart);
             //depot info and selling queue check
             getFromApi(depotAddr, updateDepot, printErrorLog, userShares, sellQueue);
@@ -153,8 +167,9 @@ function createView(sharesState, userShares, buyQueue, sellQueue, chartData, cha
             //get time one minute ago
             //TODO: change to ntp to sync local time with server time (if local time is ahead more than one minute no messages are shown)
             let time = new Date().getTime() - (60 * 1000);
+            //get news of the last 60 seconds
             getFromApi(newsAddr + time, printNews, printErrorLog, null);
-            //trading queue
+            //trading queue view update
             printTradingQueue(sellQueue, buyQueue);
         }
         , interval);
@@ -226,13 +241,13 @@ function addTradeElement(name, amount, mVal, tradeQueue) {
 
 /** get request from rest api with callbackfuntions
  *
- * @param serverAddr  url for get request
+ * @param serverAddr  url/ip for get request
  * @param successCallback called if success
  * @param failCallback called if error
- * @param prevState previousState, object to store data
- * @param userShares shares in possession of the user
- * @param buyQueue buy assignment list
- * @param sellQueue sell assignment list
+ * @param prevState previous global shares state, object to store data
+ * @param tradeQueue trade assingment list
+ * @param chartData arrays with data to plot
+ * @param chart object
  */
 function getFromApi(serverAddr, successCallback, failCallback, prevState, tradeQueue, chartData, chart) {
     //start request
@@ -245,7 +260,7 @@ function getFromApi(serverAddr, successCallback, failCallback, prevState, tradeQ
             failCallback("Error connecting to server: " + request.response);
             return;
         }
-        //if shareList param  not null go into function that builds global shares and checks trading queues
+        //null check used for two different succesCallBackFunctions
         if (prevState !== null) {
             prevState.shares = successCallback(JSON.parse(request.responseText), prevState.shares, tradeQueue, chartData, chart);
         } else {
@@ -256,12 +271,19 @@ function getFromApi(serverAddr, successCallback, failCallback, prevState, tradeQ
     request.send();
 }
 
-/** post request to rest api
+/** rest api post request
  *
- * @param serverAddr url for post
- * @param data data object
- * @param successCallback
- * @param failCallback
+ * @param serverAddr url/ip of rest server api
+ * @param data data to post
+ * @param successCallback call if successfully posted
+ * @param failCallback call if post failed
+ * @param tradeQueue trading queue
+ * @param mVal value treshold for trading
+ * @param name name of the share
+ * @param amount amount of shares to sell
+ *
+ * can be called by buy event. in this case: if buy event fails (market availability changed between last update and post, not enough money, etc)
+ * an identical assignment is added to the tradeQueue for compensation (trade will be done later if criteria are met again)
  */
 function postToApi(serverAddr, data, successCallback, failCallback, tradeQueue, mVal, name, amount) {
     //start request
@@ -269,7 +291,7 @@ function postToApi(serverAddr, data, successCallback, failCallback, tradeQueue, 
     request.open("POST", serverAddr, true); //async
     request.setRequestHeader("Content-type", "application/json");
     request.onload = function () {
-        //if not expected
+        //if not expected return
         if (request.status !== 201) {
             failCallback("Error trading with status " + request.status + ": " + request.response, name, amount, tradeQueue, mVal);
             return;
@@ -279,44 +301,86 @@ function postToApi(serverAddr, data, successCallback, failCallback, tradeQueue, 
     request.send(JSON.stringify(data));
 }
 
+/** normal trade event (buy/sell)
+ *
+ * in postToApi checks for succesfull trades are triggert. If not succesfull, they get reassigned
+ *
+ * @param _name name of the share
+ * @param _amount amount to trade
+ * @param tradeQueue
+ * @param mVal value treshold (max buying, min selling value)
+ */
 function tradeShare(_name, _amount, tradeQueue, mVal) {
     const dataObj = {
         "aktie": {"name": _name},
         "anzahl": _amount
     };
     postToApi(tradeAddr, dataObj, getTradeInfo, tradeError, tradeQueue, mVal, _name, _amount);
-    return true;
 }
 
+/** trade event for quick buy function (buying a single share without min selling value or max buying value)
+ *
+ * if this event fails, only log is generated and the assignment is not beeing reassinged but dropped
+ *
+ * @param _name of share to trade
+ * @param _amount of shares to trade
+ */
 function tradeShareNonCheck(_name, _amount) {
     const dataObj = {
         "aktie": {"name": _name},
         "anzahl": _amount
     };
     postToApi(tradeAddr, dataObj, getTradeInfo, printErrorLog);
-    return true;
 }
 
-
+/**gets called by postToApi() failCallback() after unsuccessful trading
+ *
+ * post information about failed trade to logs and reassigns the offer
+ *
+ * @param errorString server response and status code
+ * @param name of the share to trade
+ * @param amount to trade
+ * @param tradeQueue as target for addTradeElemnt()
+ * @param mVal (max buy price/min sell price)
+ */
 function tradeError(errorString, name, amount, tradeQueue, mVal) {
     printErrorLog(errorString);
     addTradeElement(name, amount, mVal, tradeQueue);
 }
 
+
+/** appends error string to top of logs
+ *
+ * @param errorString log content line
+ */
 function printErrorLog(errorString) {
     document.getElementById("logs").innerText = errorString + "\n"
         + document.getElementById("logs").innerText;
 }
 
+/**adds successfully finished trade events to sales list top
+ *
+ * @param tradeMessage sales information from rest api umsaetze/id
+ */
 function printTrade(tradeMessage) {
     document.getElementById("sales").innerText = tradeMessage.anzahl + " " + tradeMessage.aktie.name + ", at " + tradeMessage.aktie.preis + " each\n"
         + document.getElementById("sales").innerText;
 }
 
+/**gets information about trade after successfull trade from rest api
+ *
+ * only the information about the specific trade is requested
+ *
+ * @param tradeMessage rest api return of successful trade
+ */
 function getTradeInfo(tradeMessage) {
     getFromApi(salesAddr + tradeMessage.id, printTrade, printErrorLog, null);
 }
 
+/** updates element "The Best of the Best" sorted buy account value*
+ *
+ * @param _usersData name and balance of all users
+ */
 function printBestList(_usersData) {
     //clear table
     const table = document.getElementById("bestList");
@@ -333,11 +397,21 @@ function printBestList(_usersData) {
     }
 }
 
+
+/** gets new depot information and checks sell assignments if criteria are met
+ * updates views
+ *
+ * @param _userData complete depot information of user
+ * @param prevState depot information of old request
+ * @param sellQueue
+ * @returns {*}
+ */
 function updateDepot(_userData, prevState, sellQueue) {
-    //check selling queue first (no time to loose!)
+    //check selling queue first (no time to loose after updated!)
     checkSellQueue(_userData, sellQueue);
-    //clone bcs we need sorted and unsorted version
+    //clone bcs we need sorted and unsorted version of informatuib
     let userData = Object.create(_userData.positionen);
+
     //check if depot changed
     let stateIsTheSame = false;
     if (prevState.length === userData.length) {
@@ -350,14 +424,15 @@ function updateDepot(_userData, prevState, sellQueue) {
         }
     }
 
-    //update sell shares
+    //update "Sell Shares" select if status changed
     if (!stateIsTheSame) {
         const select = document.getElementById("sellName");
+        //check which share is currently seleceted at select to reselect after update (musst be done by name, bcs index might change)
         let selected = select.selectedIndex;
         if (selected !== -1) {
             selected = select.options[selected].text;
         }
-        //clear select, call legth method once only!
+        //clear select, call length method once only!
         for (let i = select.options.length; i > 0; i--) {
             select.options.remove(0);
         }
@@ -369,21 +444,11 @@ function updateDepot(_userData, prevState, sellQueue) {
                 select.options.add(newOption);
             }
         }
-        //reselect old element, if not existent anymore set -1
-        let stillExists = false;
-        for (let i = select.length; i > 0; i--) {
-            if (selected === select.options[i - 1].text) {
-                select.selectedIndex = i - 1;
-                stillExists = true;
-                break;
-            }
-        }
-        if (!stillExists) {
-            select.selectedIndex = -1;
-        }
-
+        reselectSelected(select, selected);
     }
-    //always update depot bcs of resorting by total value
+    //always update "Your Depot" as sort by total value changes very often
+    //therefore cheaper to just change instead of check first than change most ot the times
+
     //clear table
     const table = document.getElementById("depot");
     clearVerticalTable(table);
@@ -404,23 +469,49 @@ function updateDepot(_userData, prevState, sellQueue) {
             totalDepotValue += value;
         }
     }
-    //write total depot value into users information
+    //write total depot value into "User Data"
     document.getElementById("userDataTable").rows[2].cells[1].innerText = formatNumber(totalDepotValue);
 
-    //return unsorted data as sort changes to often and makes comparison between states way to expensive
+    //return unsorted data as sorted changes to often and makes comparison between states way to expensive
     return _userData.positionen;
-
 }
 
+/** reselect select after updates
+ *
+ * @param select DOM obj
+ * @param selected previous selected value
+ */
+function reselectSelected(select, selected) {
+    //reselect old element, if not existent anymore set -1
+    let stillExists = false;
+    for (let i = select.length; i > 0; i--) {
+        if (selected === select.options[i - 1].text) {
+            select.selectedIndex = i - 1;
+            stillExists = true;
+            break;
+        }
+    }
+    if (!stillExists) {
+        select.selectedIndex = -1;
+    }
+}
+
+/**create "Trading Queue" view
+ *
+ * @param sellQueue
+ * @param buyQueue
+ */
 function printTradingQueue(sellQueue, buyQueue) {
     const table = document.getElementById("tradingQueue");
     clearVerticalTable(table);
+    //print sell queue
     for (let i = 0; i < sellQueue.shares.length; i++) {
         const row = table.insertRow(1);
         row.insertCell(0).innerText = sellQueue.shares[i].name;
         row.insertCell(1).innerText = sellQueue.shares[i].amount;
         row.insertCell(2).innerText = sellQueue.shares[i].mVal;
     }
+    //print buy queue
     for (let i = 0; i < buyQueue.shares.length; i++) {
         const row = table.insertRow(1);
         row.insertCell(0).innerText = buyQueue.shares[i].name;
@@ -429,6 +520,11 @@ function printTradingQueue(sellQueue, buyQueue) {
     }
 }
 
+
+/** updates view "User Data"
+ *
+ * @param _userData
+ */
 function printUserData(_userData) {
     const table = document.getElementById("userDataTable");
     table.rows[0].cells[1].innerText = _userData.name;
@@ -443,30 +539,35 @@ function clearVerticalTable(table) {
 }
 
 
-//format to xx,xxx.xx
+//format to xx,xxx.xx (better readability if all are formated the same)
 function formatNumber(number) {
+    //correct number of arguments (mistake by webstorm)
     return number.toLocaleString('en-US', {useGrouping: true, minimumFractionDigits: 2});
 }
 
 
-/** compares global stock names to previous state and adds changes in "Global Stock State" and "Buy Shares"
- *  checks trading queues if any assignment is hit
+/**gets called by getFromApi() after global shares info got updated
+ *
+ * calls checkBuyQueue() and therefore triggers buyEvents from queue if criteria are met
+ * compares new list of shares with last list of shares and recreates view or updated view based
+ * on comparison result
  *
  *
- * @param sharesState obj created from rest api response, new global shares state
- * @param oldSharesState old global shares state
- * @param  userShares depot information of user
- * @param buyQueue buy assignments
- * @param sellQueue sett assignments
+ * @param sharesState new global shares state
+ * @param oldSharesState last global shares state for comparison
+ * @param buyQueue
+ * @param chartData plot data
+ * @param chart object
+ * @returns {*}
  */
 function updateGlobalShares(sharesState, oldSharesState, buyQueue, chartData, chart) {
     //check buying queue first, as other users might try to buy after rest api update too
     checkBuyQueue(sharesState, buyQueue);
-    //sort by name
+    //sort shares from rest api respne by name
     sharesState.sort(function (a, b) {
         return b.name.localeCompare(a.name)
     });
-    //update values and available only at "GlobalStockState" if shares available did not change
+    //small update if shares on the market are still the same
     if (sharesAreTheSame(sharesState, oldSharesState)) {
         updateChart(chartData, chart, sharesState);
         const table = document.getElementById("globalStockTable");
@@ -474,15 +575,20 @@ function updateGlobalShares(sharesState, oldSharesState, buyQueue, chartData, ch
             table.rows[i + 1].cells[1].innerText = formatNumber(sharesState[sharesState.length - i - 1].preis); // need to read from the opposite way
             table.rows[i + 1].cells[2].innerText = sharesState[sharesState.length - i - 1].anzahlVerfuegbar;
         }
-    } else { //create new "Global Stock State" and "Buy Shares" select
+    } else { //create new "Global Stock State" and "Buy Shares" select if shares available in the market changed
         createGlobalStockViews(sharesState);
         resetChart(chartData, chart, sharesState);
     }
-    //return to set as prevState
+    //return sharesState (gets assinged as old state in getFromApi()
     return sharesState;
 }
 
-//checks if two shareStates are the same and returns boolean
+/** checks if shares on stock market changed
+ *
+ * @param sharesState1
+ * @param sharesState2
+ * @returns {boolean}
+ */
 function sharesAreTheSame(sharesState1, sharesState2) {
     let same = false;
     if (sharesState1.length === sharesState2.length) { //if amount has changed, no need to check each
@@ -504,17 +610,16 @@ function sharesAreTheSame(sharesState1, sharesState2) {
  */
 function createGlobalStockViews(sharesState) {
     const table = document.getElementById("globalStockTable");
-    //clear global stock state view
+    //clear "Global Stock State"
     clearVerticalTable(table);
+    //clear "Buy Shares" select
     const select = document.getElementById("buyName");
-
-    //save which share is selected and reselect after update
+    //save which share is selected and reselect after update if still available
     let selected = select.selectedIndex;
     if (selected !== -1) {
         selected = select.options[selected].text;
     }
     const length = select.options.length;
-
     //clear select
     for (let i = 0; i < length; i++) {
         select.options.remove(0);
@@ -532,19 +637,19 @@ function createGlobalStockViews(sharesState) {
         newOption.text = sharesState[i].name;
         select.options.add(newOption, 0);
     }
-
-    //reselect share
-    select.selectedIndex = selected;
+    reselectSelected(select, selected);
 }
 
-/**quecks buying queue and buys shares if criteria are met
+/**checks buying queue and buys shares if criteria are met
  *
- * does also partly buys, if more shares are ordered than on the market and edits order to those remaining
+ * does also partly buys, if more shares are ordered than on the market buy all available
+ * and reassing order with updated amount to buy
  *
  * @param sharesState global stock state
  * @param buyQueue orders
  */
 function checkBuyQueue(sharesState, buyQueue) {
+    //list of elements to splice from buyQueue after operation (those who meet the criteria will get bought)
     let toSplice = [];
     //check each element in buyQueue
     for (let i = 0; i < buyQueue.shares.length; i++) {
@@ -564,14 +669,21 @@ function checkBuyQueue(sharesState, buyQueue) {
                         buyQueue.shares[i].amount -= available;
                     }
                 }
-                //dont go through other share from SharesState
+                //dont go through other share from SharesState if the right one is found
                 break;
             }
         }
     }
+    //remove all successfull trades
+    //if local information tell a trade will be successfull they get removed from list but readed in failureCallback() of postToApi()
     splice(toSplice, buyQueue);
 }
 
+/** removes elements from array for given index array
+ *
+ * @param toSplice array of indexes where to splice
+ * @param array where splices are done
+ */
 function splice(toSplice, array) {
     //sort that last one gets removed first, so index changing is not affecting splicing
     toSplice.sort((a, b) => b - a);
@@ -584,7 +696,6 @@ function splice(toSplice, array) {
 /**checks sell queue and sells shares if criteria are met
  *
  * @param userShares users depot
- * @param sharesState global share state
  * @param sellQueue sell assignments
  */
 function checkSellQueue(userShares, sellQueue) {
@@ -594,7 +705,7 @@ function checkSellQueue(userShares, sellQueue) {
         for (let j = 0; j < userShares.positionen.length; j++) {
             if (userShares.positionen[j].aktie.name === sellQueue.shares[i].name) {
                 let available = userShares.positionen[j].anzahl;
-                //remove from queue if not in stock anymore (mutiple assignments can be set for same stock)
+                //remove from queue if not in stock anymore (multiple assignments can be set for same stock)
                 if (available === 0) {
                     toSplice.push(i);
                     break;
@@ -617,7 +728,16 @@ function checkSellQueue(userShares, sellQueue) {
     splice(toSplice, sellQueue);
 }
 
-
+/** changes chartData and triggers update of chart
+ *
+ * gets called by updateGlobalShares()
+ *
+ * chartData length stays the same, first element removed, last element appended
+ *
+ * @param chartData dataset of plot
+ * @param chart plot obj
+ * @param sharesState global shares state
+ */
 function updateChart(chartData, chart, sharesState) {
     for (let i = 0; i < sharesState.length; i++) {
         chartData.data.datasets[i].data.push(sharesState[i].preis);
@@ -626,6 +746,14 @@ function updateChart(chartData, chart, sharesState) {
     chart.update();
 }
 
+/**resets chart completly (new labels, new data)
+ *
+ * gets called by updateGlobalShares() if shares available on the market changed
+ *
+ * @param chartData plot data set
+ * @param chart obj
+ * @param sharesState global shares state
+ */
 function resetChart(chartData, chart, sharesState) {
     //create new chartDataSet
     chartData.data.datasets = [];
@@ -636,6 +764,7 @@ function resetChart(chartData, chart, sharesState) {
             {
                 data: Object.create(zeroArray),
                 label: sharesState[i].name,
+                //use different color for each
                 borderColor: color(i),
                 fill: false
             }
@@ -643,6 +772,7 @@ function resetChart(chartData, chart, sharesState) {
         //add fist value to last position
         chartData.data.datasets[i].data.push(sharesState[i].preis);
     }
+    //update chart View
     chart.update();
 
 }

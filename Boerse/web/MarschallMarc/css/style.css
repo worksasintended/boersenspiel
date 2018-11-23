@@ -42,6 +42,23 @@ h2{
     width: 100%;
 }
 
+.logs {
+    overflow-y: scroll;
+    height: 10em;
+    resize: none;
+    width: 100%;
+    font-size: 70%
+}
+
+.logsElement {
+    background-color: #f0f0f0;
+    color: #000000;
+    float: left;
+    width: 98%;
+    margin: 1%;
+    padding: 2%;
+    border-radius: 15px;
+}
 .chartParent {
     background-color: #f0f0f0;
     color: #000000;
