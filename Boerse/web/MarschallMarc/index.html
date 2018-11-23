@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" charset="utf-8">
+    <link rel="stylesheet" type="text/css" href="css/style.css">
+    <title>Trading Post</title>
+    <script src="js/script.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.5.0/Chart.min.js"></script>
+</head>
+<body>
+<header>
+    Trading Post
+</header>
+
+<main>
+
+    <div class =chartParent>
+        <canvas id="chart" class="chart"></canvas>
+    </div>
+
+    <div class="stockElement">
+        <h2>Global Stock State</h2>
+        <table id="globalStockTable">
+            <tr>
+                <th>Name</th>
+                <th>Price</th>
+                <th>Available</th>
+            </tr>
+        </table>
+    </div>
+
+    <div class="stockElement">
+        <h2>Trade Shares</h2>
+        <h3>Buy Shares</h3>
+        <form class="form" id="buyForm">
+            <select id="buyName" name="Select Share" required>
+            </select>
+            <input type="number" min="0" step="1" placeholder="Amount" id="buyAmount" maxlength="10" required>
+            <input type="number" min="0" pattern="[0-9]+([\,.][0-9]+)?" step=".01" placeholder="Max Value" id="buyMaxValue" maxlength="10" required>
+            <button type="button" id="addBuyElement">Add Item</button>
+        </form>
+        <h3>Sell Shares</h3>
+        <select id="sellName" name="Select Share" required>
+        </select>
+        <input type="number" min="0" step="1" placeholder="Amount" id="sellAmount" maxlength="10" required>
+        <input type="number" min="0" pattern="[0-9]+([\,.][0-9]+)?" step=".01" placeholder="Min Value" id="sellMinValue" maxlength="10" required>
+        <button type="button" id="addSellElement">Add Item</button>
+        </form>
+        <h3>Trading Queue</h3>
+        <table id="tradingQueue">
+            <tr>
+                <th>Share</th>
+                <th>Amount</th>
+                <th class="money">Price Threshold</th>
+            </tr>
+        </table>
+    </div>
+
+    <div class="stockElement">
+        <h2>User Data</h2>
+        <table id="userDataTable">
+            <tr>
+                <th>Name:</th>
+                <td></td>
+            </tr>
+            <tr>
+                <th>Balance:</th>
+                <td></td>
+            </tr>
+            <tr>
+                <th>Depot Value:</th>
+                <td></td>
+            </tr>
+        </table>
+        <h3>Your Depot</h3>
+        <table id="depot">
+            <tr>
+                <th>Name</th>
+                <th>Price</th>
+                <th>Amount</th>
+                <th>Value</th>
+            </tr>
+        </table>
+    </div>
+
+
+
+
+
+
+
+
+    <div class="stockElement">
+
+        <h2>The Best of the best</h2>
+        <table id="bestList">
+            <tr>
+                <th>Name:</th>
+                <th>Balance</th>
+            </tr>
+        </table>
+
+    </div>
+
+
+</main>
+
+<footer> &#x24B8; Marc Marschall 2018</footer>
+</body>
+</html>

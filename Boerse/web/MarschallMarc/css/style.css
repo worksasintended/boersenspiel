@@ -1,0 +1,132 @@
+* {
+    box-sizing: border-box;
+    font-family: Verdana, sans-serif;
+    color: #000000;
+    background-color: #f0f0f0;
+
+}
+
+header {
+    padding: 15px;
+    text-align: center;
+    border-radius: 15px;
+    background: #f0f0f0 url('../img/head.jpg');
+    background-size: 100% 100%;
+    font-size: 300%;
+    font-weight: bold;
+    color: #f0f0f0;
+}
+
+
+main {
+    color: #000000;
+    float: left;
+    width: 100%;
+    padding: 20px;
+    margin-top: 10px;
+    border-radius: 15px;
+    overflow: auto;
+    background: #d0d0d0 url('../img/bg3.jpg');
+    background-size: 100% 100%;
+    /* border:2px solid #000000;*/
+}
+
+h2{
+    border-radius: 15px;
+}
+
+.chartParent {
+    background-color: #f0f0f0;
+    color: #000000;
+    float: left;
+    width: 48%;
+    margin: 1%;
+    border-radius: 15px;
+}
+
+.chart {
+    border-radius: 15px;
+}
+
+
+.stockElement {
+    background-color: #f0f0f0;
+    color: #000000;
+    float: left;
+    width: 48%;
+    margin: 1%;
+    padding: 2%;
+    border-radius: 15px;
+}
+
+.sellElement{
+    width: 25vw;
+    margin-top: 2vw;
+    margin-left: auto;
+    margin-right: auto;
+    display: grid;
+    grid-template-columns: 49% 2% 49%;
+    grid-template-rows: 40px 8px 40px 8px 200px 40px;
+
+}
+
+table{
+    border-radius: 15px;
+    width: 100%;
+}
+
+th{
+    text-align: left;
+}
+
+td{
+    text-align: left;
+}
+
+
+
+footer {
+    color: #ffffff;
+    background-color: #51555a;
+    text-align: center;
+    padding: 10px;
+    margin-top: 30px;
+    border-radius: 10px;
+    float: left;
+    width: 100%;
+}
+
+@media (max-width: 1000px){
+    .chartParent{
+        width: 98%;
+    }
+}
+
+
+
+
+
+@media only screen and (max-width: 620px) {
+    /* For mobile phones: */
+    li a {
+        margin-top: 5px;
+        margin-bottom: 5px;
+        width: 100%;
+        display: block;
+    }
+
+    .stockElement {
+        background-color: #f0f0f0;
+        color: #000000;
+        float: left;
+        width: 98%;
+        margin: 1%;
+        padding: 2%;
+        border-radius: 15px;
+    }
+    .chartParent{
+        width: 98%;
+    }
+}
+
+

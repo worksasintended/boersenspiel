@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="express" type="javaScript">
+    <CLASSES>
+      <root url="file://$PROJECT_DIR$/../ node-js/node_modules/express" />
+      <root url="file://$USER_HOME$/node_modules/express" />
+    </CLASSES>
+    <SOURCES />
+  </library>
+</component>
