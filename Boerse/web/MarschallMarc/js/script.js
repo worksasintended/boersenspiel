@@ -397,6 +397,25 @@ function printBestList(_usersData) {
     }
 }
 
+/** compares depot at two different sttes
+ *
+ * @param prevState
+ * @param userData
+ * @returns {boolean}
+ */
+function depotChanged(prevState, userData){
+    let stateChanged = true;
+    if (prevState.length === userData.length) {
+        stateChanged = false;
+        for (let i = 0; i < userData.length; i++) {
+            if (userData[i].aktie.name !== prevState[i].aktie.name || userData[i].anzahl !== prevState[i].anzahl) {
+                stateChanged = true;
+                break;
+            }
+        }
+    }
+    return stateChanged;
+}
 
 /** gets new depot information and checks sell assignments if criteria are met
  * updates views
@@ -412,20 +431,8 @@ function updateDepot(_userData, prevState, sellQueue) {
     //clone bcs we need sorted and unsorted version of informatuib
     let userData = Object.create(_userData.positionen);
 
-    //check if depot changed
-    let stateIsTheSame = false;
-    if (prevState.length === userData.length) {
-        stateIsTheSame = true;
-        for (let i = 0; i < userData.length; i++) {
-            if (userData[i].aktie.name !== prevState[i].aktie.name || userData[i].anzahl !== prevState[i].anzahl) {
-                stateIsTheSame = false;
-                break;
-            }
-        }
-    }
-
     //update "Sell Shares" select if status changed
-    if (!stateIsTheSame) {
+    if (depotChanged(prevState,userData)) {
         const select = document.getElementById("sellName");
         //check which share is currently seleceted at select to reselect after update (musst be done by name, bcs index might change)
         let selected = select.selectedIndex;
@@ -449,7 +456,17 @@ function updateDepot(_userData, prevState, sellQueue) {
     //always update "Your Depot" as sort by total value changes very often
     //therefore cheaper to just change instead of check first than change most ot the times
 
-    //clear table
+    updateDepotView(userData);
+
+    //return unsorted data as sorted changes to often and makes comparison between states way to expensive
+    return _userData.positionen;
+}
+
+/**updates table at "Your Depot" and "Depot Value"
+ *
+ * @param userData
+ */
+function updateDepotView(userData){
     const table = document.getElementById("depot");
     clearVerticalTable(table);
     //sort data by value*amount
@@ -471,9 +488,6 @@ function updateDepot(_userData, prevState, sellQueue) {
     }
     //write total depot value into "User Data"
     document.getElementById("userDataTable").rows[2].cells[1].innerText = formatNumber(totalDepotValue);
-
-    //return unsorted data as sorted changes to often and makes comparison between states way to expensive
-    return _userData.positionen;
 }
 
 /** reselect select after updates
