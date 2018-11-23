@@ -13,36 +13,32 @@
 </header>
 
 <main>
-
-    <div class =chartParent>
+    <div class=chartParent>
         <canvas id="chart" class="chart"></canvas>
     </div>
-
     <div class="stockElement">
         <h2>News</h2>
         <div class="news" id="news">
 
         </div>
     </div>
-
-
-
-
     <div class="stockElement">
         <h2>Trade Shares</h2>
         <h3>Buy Shares</h3>
         <form class="form" id="buyForm">
-            <select id="buyName" name="Select Share" required>
+            <select title="Shares" id="buyName" name="Select Share" required>
             </select>
             <input type="number" min="0" step="1" placeholder="Amount" id="buyAmount" maxlength="10" required>
-            <input type="number" min="0" pattern="[0-9]+([\,.][0-9]+)?" step=".01" placeholder="Max Value" id="buyMaxValue" maxlength="10" required>
+            <input type="number" min="0" pattern="[0-9]+([\,.][0-9]+)?" step=".01" placeholder="Max Value"
+                   id="buyMaxValue" maxlength="10" required>
             <button type="button" id="addBuyElement">Add Item</button>
         </form>
         <h3>Sell Shares</h3>
-        <select id="sellName" name="Select Share" required>
+        <select title="Share" id="sellName" name="Select Share" required>
         </select>
         <input type="number" min="0" step="1" placeholder="Amount" id="sellAmount" maxlength="10" required>
-        <input type="number" min="0" pattern="[0-9]+([\,.][0-9]+)?" step=".01" placeholder="Min Value" id="sellMinValue" maxlength="10" required>
+        <input type="number" min="0" pattern="[0-9]+([\,.][0-9]+)?" step=".01" placeholder="Min Value" id="sellMinValue"
+               maxlength="10" required>
         <button type="button" id="addSellElement">Add Item</button>
         </form>
         <h3>Trading Queue</h3>
@@ -92,16 +88,7 @@
             </tr>
         </table>
     </div>
-
-
-
-
-
-
-
-
     <div class="stockElement">
-
         <h2>The Best of the Best</h2>
         <table id="bestList">
             <tr>
@@ -109,26 +96,19 @@
                 <th>Balance</th>
             </tr>
         </table>
-
     </div>
-
     <div class="stockElement">
         <h2>Sales</h2>
         <div class="news" id="sales">
 
         </div>
     </div>
-
-
-
     <div class="logsElement">
         <h3>Logs</h3>
         <div class="logs" id="logs">
 
         </div>
     </div>
-
-
 </main>
 
 <footer> &#x24B8; Marc Marschall 2018</footer>
